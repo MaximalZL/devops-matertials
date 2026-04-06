@@ -1,0 +1,11 @@
+[Unit]
+Description=Write current date to /var/log/myapp.log
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/log-date.sh
+User=root
+
+[Install]
+WantedBy=multi-user.target

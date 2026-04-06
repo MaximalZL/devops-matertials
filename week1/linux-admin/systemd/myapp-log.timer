@@ -1,0 +1,11 @@
+[Unit]
+Description=Run myapp-log.service every 2 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+Unit=myapp-log.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
