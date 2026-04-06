@@ -4,6 +4,8 @@
 
 ```text
 week1/
+├── git/
+│   └── git.md
 ├── img/
 │   └── screen_users_and_rights.jpg
 ├── linux-admin/
@@ -31,6 +33,10 @@ week1/
 - [linux-permissions.md](week1/linux-admin/linux-permissions.md)
 - [linux-signals.md](week1/linux-admin/linux-signals.md)
 - [systemd.md](week1/linux-admin/systemd.md)
+
+### Git
+
+- [git.md](week1/git/git.md)
 
 ### Systemd Files
 
@@ -128,3 +134,7 @@ chmod +x week1/scripts/log_parser.sh
 ```bash
 bash week1/scripts/log_parser.sh
 ```
+
+### Task 5
+
+В директории Git проекта создан файл [git.md](week1/git/git.md) с кратким описанием Git и его основных команд.
