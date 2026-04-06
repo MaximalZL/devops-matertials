@@ -1,10 +1,13 @@
-# DevOps Homework Repository
+﻿# DevOps Homework Repository
 
 ## Структура
 
 ```text
 week1/
+├── img/
+│   └── screen_users_and_rights.jpg
 ├── linux-admin/
+│   ├── bash.md
 │   ├── debian-setup.md
 │   ├── load-average.md
 │   ├── linux-permissions.md
@@ -13,10 +16,29 @@ week1/
 │   └── systemd/
 │       ├── myapp-log.service
 │       └── myapp-log.timer
-├── scripts/
-│    └── log-date.sh
-└── README.md
+└── scripts/
+    └── log-date.sh
 ```
+
+## Переход к материалам
+
+### Linux Admin
+
+- [bash.md](week1/linux-admin/bash.md)
+- [debian-setup.md](week1/linux-admin/debian-setup.md)
+- [load-average.md](week1/linux-admin/load-average.md)
+- [linux-permissions.md](week1/linux-admin/linux-permissions.md)
+- [linux-signals.md](week1/linux-admin/linux-signals.md)
+- [systemd.md](week1/linux-admin/systemd.md)
+
+### Systemd Files
+
+- [myapp-log.service](week1/linux-admin/systemd/myapp-log.service)
+- [myapp-log.timer](week1/linux-admin/systemd/myapp-log.timer)
+
+### Scripts
+
+- [log-date.sh](week1/scripts/log-date.sh)
 
 ## Week 1
 
@@ -73,3 +95,7 @@ week1/
 ### Screenshots
 
 ![Пользователи, группа devops и права на shared](week1/img/screen_users_and_rights.jpg)
+
+### Task 3
+
+В директории Linux проекта создать .md файл с кратким описанием Bash, описать требования к файлу, чтоб он мог выполнится как скрипт
