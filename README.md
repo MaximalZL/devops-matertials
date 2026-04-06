@@ -17,7 +17,8 @@ week1/
 │       ├── myapp-log.service
 │       └── myapp-log.timer
 └── scripts/
-    └── log-date.sh
+    ├── log-date.sh
+    └── log_parser.sh
 ```
 
 ## Переход к материалам
@@ -39,6 +40,7 @@ week1/
 ### Scripts
 
 - [log-date.sh](week1/scripts/log-date.sh)
+- [log_parser.sh](week1/scripts/log_parser.sh)
 
 ## Week 1
 
@@ -99,3 +101,30 @@ week1/
 ### Task 3
 
 В директории Linux проекта создать .md файл с кратким описанием Bash, описать требования к файлу, чтоб он мог выполнится как скрипт
+
+### Task 4
+
+В директории `week1/scripts` добавлен bash-скрипт [log_parser.sh](week1/scripts/log_parser.sh).
+
+Что делает скрипт:
+
+- читает `/var/log/syslog`, а если его нет, то `/var/log/messages`
+- выбирает строки за последние 10 минут
+- ищет строки с `error`, `fail`, `critical` без учета регистра
+- сохраняет найденные строки в файл `errors_$(date +%F).log`
+- отправляет содержимое через POST на `https://httpbin.org/post`
+- если лог-файл не найден, завершает работу с кодом `1`
+- если отправка не удалась, делает до 3 попыток с паузой 10 секунд
+
+Запуск:
+
+```bash
+chmod +x week1/scripts/log_parser.sh
+./week1/scripts/log_parser.sh
+```
+
+Если удобнее, можно запустить и так:
+
+```bash
+bash week1/scripts/log_parser.sh
+```
