@@ -21,22 +21,25 @@ week1/
 └── scripts/
     ├── log-date.sh
     └── log_parser.sh
+week2/
+└── ansible/
+    └── ansible-overview.md
 ```
 
 ## Переход к материалам
 
 ### Linux Admin
 
-- [bash.md](week1/linux-admin/bash.md)
-- [debian-setup.md](week1/linux-admin/debian-setup.md)
-- [load-average.md](week1/linux-admin/load-average.md)
-- [linux-permissions.md](week1/linux-admin/linux-permissions.md)
-- [linux-signals.md](week1/linux-admin/linux-signals.md)
-- [systemd.md](week1/linux-admin/systemd.md)
+- [Bash](week1/linux-admin/bash.md)
+- [Debian setup](week1/linux-admin/debian-setup.md)
+- [Load-average](week1/linux-admin/load-average.md)
+- [Linux permissions](week1/linux-admin/linux-permissions.md)
+- [Linux signals](week1/linux-admin/linux-signals.md)
+- [Systemd](week1/linux-admin/systemd.md)
 
 ### Git
 
-- [git.md](week1/git/git.md)
+- [Git](week1/git/git.md)
 
 ### Systemd Files
 
@@ -47,6 +50,10 @@ week1/
 
 - [log-date.sh](week1/scripts/log-date.sh)
 - [log_parser.sh](week1/scripts/log_parser.sh)
+
+### Ansible
+
+- [Ansible Overview](week2/ansible/ansible-overview.md)
 
 ## Week 1
 
@@ -158,3 +165,10 @@ git remote add origin https://gitlab.com/<ваш-логин>/devops-week1.git
 - Пример вывода
 5. Включите code review — даже если нет реального ревьюера, добавьте комментарий от себя:
 _«[Self-review] Проверил обработку ошибок и совместимость с Debian 12»_
+
+## Week 2
+
+### Task 1
+
+В директории Ansible проекта создать .md файл с описанием возможностей и компонентов Ansilbe, а также best practices по написанию playbook.
+Развернуть 2 ВМ (Ansible + Linux для настройки)
