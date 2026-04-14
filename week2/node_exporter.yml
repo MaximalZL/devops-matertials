@@ -1,0 +1,6 @@
+﻿---
+- name: Deploy Node Exporter
+  hosts: target
+  become: true
+  roles:
+    - node_exporter

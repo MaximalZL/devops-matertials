@@ -1,0 +1,6 @@
+---
+- name: Setup base services and users
+  hosts: target
+  become: true
+  roles:
+    - base
