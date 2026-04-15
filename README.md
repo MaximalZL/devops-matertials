@@ -91,6 +91,10 @@ week2/
 - [Ansible Overview](week2/ansible-overview.md)
 - [How run tasks week2](week2/run-tasks.md)
 
+## Дополнительно
+
+- [Разбор вопросов](addition/questions.md)
+
 ## Week 1
 
 ### Task 1:
