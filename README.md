@@ -58,7 +58,12 @@ week2/
 ├── node_exporter.yml
 ├── site.yml
 └── run-tasks.md
-
+week3/
+├── docker
+│   ├── todoism/
+│   │   ├── ...
+│   │   └── Dockerfile
+│   └── dockerfile_overview.md
 ```
 
 ## Переход к материалам
@@ -90,6 +95,10 @@ week2/
 
 - [Ansible Overview](week2/ansible-overview.md)
 - [How run tasks week2](week2/run-tasks.md)
+
+## Docker
+
+- [Docker Overview](week3/docker/dockerfile_overview.md)
 
 ## Дополнительно
 
@@ -320,3 +329,19 @@ README.md
 - Что делает каждая роль
 
 Результат: репозиторий на GitLab.com с рабочей структурой ролей и инструкцией.
+
+## Week 3
+
+### Docker
+
+#### Task 1
+
+В директории Docker проекта создать .md файл с описанием best practices по созданию Dockerfile
+
+#### Task 2
+
+Склонируйте репозиторий https://github.com/greyli/todoism
+
+Для этого приложения напишите Dockerfile
+
+[Посмотреть Dockerfile](week3/docker/todoism/Dockerfile)
