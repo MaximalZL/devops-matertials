@@ -560,28 +560,361 @@ grep -q "10.0.0.5 db.local" /etc/hosts || echo "10.0.0.5 db.local" | sudo tee -a
 
 ## ContainerD, CRIO
 
+`containerd` и `CRI-O` — это контейнерные runtime, которые Kubernetes использует для запуска контейнеров через интерфейс CRI (Container Runtime Interface).
+
+Что важно понимать:
+- `kubelet` не запускает контейнеры напрямую;
+- `kubelet` общается с runtime по CRI (gRPC);
+- runtime уже использует низкоуровневые компоненты (`runc`, namespaces, cgroups, overlayfs).
+
+### containerd
+- универсальный runtime от CNCF;
+- может использоваться и вне Kubernetes;
+- хорошо поддерживается экосистемой и часто является дефолтом.
+
+### CRI-O
+- runtime, заточенный именно под Kubernetes и CRI;
+- обычно минималистичнее по возможностям вне k8s;
+- часто используется в дистрибутивах, где важна “k8s-only” модель.
+
+Практически: оба варианта корректны для продакшена. Выбор обычно определяется стандартом платформы, требованиями безопасности и экспертизой команды.
+
 ## Тесты безопасности в Linux и Docker
+
+Проверки безопасности лучше строить по слоям: хост, образ, контейнер в рантайме, CI/CD.
+
+### 1. Linux-хост
+- проверка базовой конфигурации (SSH, firewall, sudo, audit);
+- регулярное обновление пакетов и ядра;
+- проверка открытых портов и лишних сервисов.
+
+Инструменты:
+- `lynis`, `openscap`, `auditd`, `fail2ban`, `nftables`/`iptables`.
+
+### 2. Docker-образы
+- сканирование CVE в base image и зависимостях;
+- проверка Dockerfile на небезопасные паттерны;
+- контроль секретов.
+
+Инструменты:
+- `trivy image`, `grype`, `docker scout`, `hadolint`, `gitleaks`/`trufflehog`.
+
+### 3. Runtime-контроль контейнеров
+- запуск не от root;
+- drop capabilities;
+- read-only root filesystem (где возможно);
+- seccomp/apparmor/SELinux.
+
+### 4. CI/CD-политики
+- сборка блокируется при критичных CVE;
+- обязательный lint Dockerfile;
+- подписание артефактов и контроль provenance/SBOM;
+- admission policy в кластере (например, OPA Gatekeeper/Kyverno).
+
+Минимальный практический набор:
+- scan Docker image + lint Dockerfile на каждый merge request;
+- nightly scan реестра образов;
+- отчеты по критичным уязвимостям и SLA на исправление.
 
 ## Control Plane и Data Plane Kubernetes
 
+`Control Plane` управляет желаемым состоянием кластера, `Data Plane` (worker-ноды) исполняет рабочую нагрузку.
+
+### Control Plane
+- `kube-apiserver`: входная точка API;
+- `etcd`: хранилище состояния кластера;
+- `kube-scheduler`: назначает Pod на ноды;
+- `kube-controller-manager`: reconciliation-контроллеры;
+- (опционально) `cloud-controller-manager`.
+
+### Data Plane (Worker)
+- `kubelet`: агент ноды;
+- runtime (`containerd`/`CRI-O`);
+- `kube-proxy` (или eBPF dataplane в зависимости от CNI);
+- CNI-плагин (Calico/Cilium/Flannel и т.д.).
+
+Идея простая:
+- Control Plane принимает решения;
+- Data Plane выполняет эти решения.
+
 ## Какие компоненты запущены на master-ноде и worker-ноде? Почему так?
+
+Термин “master” исторический, сейчас чаще говорят “control-plane node”.
+
+### На control-plane ноде
+- `kube-apiserver`;
+- `etcd` (в большинстве kubeadm-кластеров локально);
+- `kube-scheduler`;
+- `kube-controller-manager`;
+- `kubelet`, runtime и сетевые компоненты как база ноды.
+
+### На worker-ноде
+- `kubelet`;
+- runtime (`containerd`/`CRI-O`);
+- `kube-proxy` или его замена;
+- CNI-агенты.
+
+Почему так:
+- компоненты управления изолируют на control-plane ради безопасности и предсказуемости;
+- worker-ноды оставляют для пользовательских Pod;
+- в production control-plane обычно реплицируют (3+ узла) для отказоустойчивости.
 
 ## Когда нет kunernetes, то как его запустить?
 
+Если Kubernetes еще нет, способ запуска зависит от цели.
+
+### Локальная разработка
+- `minikube`;
+- `kind` (кластер в Docker);
+- `k3d` (k3s в Docker).
+
+### Пилот/стейдж/прод в своей инфраструктуре
+- `kubeadm` (классический “vanilla” путь);
+- Kubespray (Ansible-автоматизация);
+- RKE2/k3s (упрощенная эксплуатация).
+
+### Managed Kubernetes
+- AWS EKS, GKE, AKS, Yandex Managed Kubernetes и т.д.
+
+Если задача учебная или лабораторная, обычно выбирают `kubeadm` или `kind`. Если бизнес-прод и нет жестких ограничений, чаще выгоднее managed-вариант.
+
 ## Написать md-файл, что происходит при отправке kubctl apply development вплоть до рабочего состояния в деталях
+
+Ниже подробная цепочка для команды:
+
+```bash
+kubectl apply -f development
+```
+
+### 1. Клиентский этап (`kubectl`)
+- `kubectl` читает манифесты из `development`;
+- валидирует YAML/JSON и определяет типы ресурсов;
+- формирует HTTP-запросы в `kube-apiserver`.
+
+### 2. Аутентификация и авторизация
+- API Server проверяет, кто отправил запрос (сертификат, token, OIDC и т.д.);
+- затем проверяет права через RBAC/ABAC/Webhook.
+
+### 3. Admission chain
+- mutating admission может дописать поля (например, default values, sidecar-инъекции);
+- validating admission проверяет политики и ограничения.
+
+Если ресурс не прошел политику, запрос отклоняется сразу на этом этапе.
+
+### 4. Запись желаемого состояния
+- API Server сохраняет объект в `etcd`;
+- ресурс получает `resourceVersion`, UID и метаданные.
+
+### 5. Reconciliation контроллеров
+- соответствующий controller “видит” новый объект;
+- для `Deployment` создается/обновляется `ReplicaSet`;
+- `ReplicaSet` создает нужное число `Pod`.
+
+### 6. Планирование Pod
+- scheduler выбирает подходящую ноду по ресурсам, affinity, taints/tolerations, topology constraints;
+- в Pod появляется `nodeName`.
+
+### 7. Подготовка Pod на worker
+- `kubelet` получает назначение;
+- через CRI просит runtime создать sandbox и контейнеры;
+- CNI настраивает сетевой namespace и IP;
+- CSI (если есть тома) подключает хранилище;
+- образы подтягиваются из реестра.
+
+### 8. Запуск и проверки готовности
+- контейнеры стартуют;
+- `startupProbe`/`livenessProbe`/`readinessProbe` начинают работать;
+- пока `readinessProbe` не успешен, Pod не попадает в endpoint’ы сервиса.
+
+### 9. Service discovery и балансировка
+- `Service` выбирает готовые Pod по label selector;
+- EndpointSlice обновляется;
+- kube-proxy/eBPF dataplane обновляет правила маршрутизации;
+- DNS (CoreDNS) отдает имя сервиса.
+
+### 10. Стабильное рабочее состояние
+- Deployment достигает состояния `Available=True`, `Progressing=True`;
+- фактическое число реплик равно желаемому;
+- трафик идет только на Ready Pod.
+
+### 11. Что происходит дальше постоянно
+- controllers непрерывно сравнивают desired state и current state;
+- при падении Pod ReplicaSet создает новый;
+- при изменении манифеста `apply` запускает новый цикл reconcile.
+
+Ключевая идея Kubernetes: это не “запустили один раз”, а постоянное автоматическое выравнивание системы к желаемому состоянию.
 
 ## Как поднять через kubeadm?
 
+Типовой сценарий (single control-plane + worker):
+
+### 1. Подготовка узлов
+- установить совместимые версии `kubeadm`, `kubelet`, `kubectl`;
+- установить runtime (`containerd`);
+- включить необходимые kernel-параметры (`br_netfilter`, `ip_forward`);
+- отключить swap (или настроить по требованиям версии).
+
+### 2. Инициализация control-plane
+```bash
+sudo kubeadm init --pod-network-cidr=<CIDR_CNI>
+```
+
+### 3. Настройка kubectl на control-plane
+```bash
+mkdir -p $HOME/.kube
+sudo cp /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+### 4. Установка CNI
+Применяется манифест выбранного плагина (Calico/Cilium/Flannel).
+
+### 5. Подключение worker-нод
+На control-plane:
+```bash
+kubeadm token create --print-join-command
+```
+На worker:
+```bash
+sudo kubeadm join <control-plane-ip>:6443 --token ... --discovery-token-ca-cert-hash sha256:...
+```
+
+### 6. Проверка
+```bash
+kubectl get nodes -o wide
+kubectl get pods -A
+```
+
+Если все системные Pod в `Running`, кластер готов.
+
 ## Как еще можно поднять kubernetes?
+
+Кроме `kubeadm`, распространенные варианты:
+- `kind` — быстрые локальные кластеры в Docker (тесты CI/локальная разработка);
+- `minikube` — локальная разработка с удобными add-ons;
+- `k3s` — облегченный Kubernetes;
+- `RKE2` — enterprise-дистрибутив на базе k8s;
+- `Kubespray` — разворачивание “ванильного” k8s через Ansible;
+- Managed Kubernetes (`EKS`, `GKE`, `AKS` и т.д.) — минимум операционной нагрузки;
+- OpenShift/OKD — платформенный слой поверх Kubernetes.
+
+Выбор зависит от: среды (локально/облако/on-prem), требований к SLA и зрелости команды эксплуатации.
 
 ## Основные команды и как они работают
 
+Базовый рабочий набор `kubectl`:
+- `kubectl get <resource>` — получить список/состояние;
+- `kubectl describe <resource> <name>` — детальное описание + события;
+- `kubectl apply -f <file|dir>` — привести состояние к манифесту;
+- `kubectl delete -f <file|dir>` — удалить ресурсы;
+- `kubectl logs <pod>` — логи контейнера;
+- `kubectl exec -it <pod> -- <cmd>` — выполнить команду в контейнере;
+- `kubectl rollout status deployment/<name>` — отслеживать rollout;
+- `kubectl rollout undo deployment/<name>` — откат rollout;
+- `kubectl scale deployment/<name> --replicas=N` — изменить число реплик;
+- `kubectl top pod|node` — метрики CPU/RAM (нужен metrics-server);
+- `kubectl get events --sort-by=.lastTimestamp` — события.
+
+Как это работает в общем:
+- `kubectl` отправляет REST-запросы в `kube-apiserver`;
+- API Server валидирует/авторизует;
+- далее контроллеры и kubelet приводят реальное состояние к желаемому.
+
 ## Какую задачу решает Helm и почему?
+
+`Helm` решает задачу пакетирования, параметризации и версионирования Kubernetes-манифестов.
+
+Почему это важно:
+- вручную поддерживать десятки YAML по окружениям сложно;
+- нужны повторяемые установки и предсказуемые обновления;
+- нужны rollback и единый способ конфигурирования.
+
+Что дает Helm:
+- Chart как “пакет приложения”;
+- `values.yaml` для параметров окружений;
+- templating без копипасты;
+- release-история и `helm rollback`.
+
+По сути Helm в Kubernetes играет роль пакетного менеджера и стандартизирует поставку приложений.
 
 ## Как посмотреть events, журнал событий и где они хранятся?
 
+### Как смотреть события
+```bash
+kubectl get events -A --sort-by=.lastTimestamp
+kubectl describe pod <pod-name> -n <ns>
+```
+
+### Где события хранятся
+- события — это Kubernetes-ресурсы типа `Event`;
+- хранятся в `etcd` (как и другие API-объекты);
+- имеют TTL и очищаются через event garbage collection.
+
+Важно:
+- `Event` не заменяет полноценные логи;
+- для расследований нужны также логи приложений, логи нод и audit-логи API Server.
+
+### Журналы компонентов
+- `kubelet`: `journalctl -u kubelet`;
+- control-plane статические Pod: `kubectl logs -n kube-system <pod>`;
+- контейнеры приложений: `kubectl logs`.
+
 ## Что такое сетевой плагин? Зачем он нужен? Что он делает? Почему отдельно?
+
+Сетевой плагин в Kubernetes обычно называют CNI-плагином (Container Network Interface).
+
+Зачем нужен:
+- Kubernetes сам по себе не реализует контейнерную сеть “из коробки”;
+- CNI обеспечивает связность Pod-to-Pod, Pod-to-Service и egress/ingress.
+
+Что делает CNI:
+- выделяет Pod IP;
+- настраивает маршруты/overlay/encapsulation;
+- применяет сетевые политики (если поддерживаются);
+- интегрируется с kubelet при создании/удалении Pod.
+
+Почему отдельно:
+- сеть в разных инфраструктурах сильно различается;
+- модель плагина позволяет выбрать реализацию под задачу (Calico, Cilium, Flannel и т.д.);
+- это уменьшает связанность ядра Kubernetes и ускоряет развитие сетевых решений.
 
 ## Что такое сервис и как он реализуется?
 
+`Service` в Kubernetes — это стабильная сетeвая абстракция для группы Pod.
+
+Что решает:
+- Pod-ы эфемерны и могут пересоздаваться с новыми IP;
+- Service дает постоянный DNS-имя и виртуальный IP (ClusterIP).
+
+Как реализуется:
+- Service выбирает Pod через label selector;
+- API формирует EndpointSlice с актуальными backend-адресами;
+- kube-proxy (или eBPF dataplane) на нодах настраивает правила маршрутизации/балансировки.
+
+Основные типы:
+- `ClusterIP` — доступ внутри кластера;
+- `NodePort` — публикация через порт ноды;
+- `LoadBalancer` — внешний балансировщик (в облаке/интеграции);
+- `ExternalName` — DNS-алиас на внешний ресурс.
+
 ## Что будет, когда он упадет?
+
+Если под “он” имеется в виду Pod приложения:
+- Deployment/ReplicaSet заметит падение;
+- будет создан новый Pod, пока число реплик не восстановится;
+- если настроены `readinessProbe`, трафик не пойдет в нездоровый Pod.
+
+Если падает контейнер внутри Pod:
+- kubelet перезапускает его согласно `restartPolicy`;
+- при частых падениях возможен `CrashLoopBackOff`.
+
+Если падает worker-нода:
+- Node Controller пометит ноду `NotReady`;
+- Pod на этой ноде исключаются из Service endpoint’ов;
+- workload пересоздается на других нодах (если есть ресурсы и нет жестких ограничений).
+
+Если падает control-plane-компонент:
+- при single control-plane кластер может стать частично/полностью недоступным для операций управления;
+- в HA-конфигурации отказ одного узла обычно переживается, пока есть кворум `etcd` и доступный API Server.
+
+Итог: отказоустойчивость в Kubernetes достигается репликацией, health probes, правильными лимитами и многозонной архитектурой.
