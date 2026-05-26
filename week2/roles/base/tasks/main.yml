@@ -1,0 +1,116 @@
+﻿---
+- name: Update apt cache and install base packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+    name:
+      - curl
+      - git
+      - htop
+      - nginx
+      - ufw
+      - unzip
+    state: present
+
+- name: Ensure base users exist with SSH keys
+  ansible.builtin.user:
+    name: "{{ item }}"
+    state: present
+    create_home: true
+    shell: /bin/bash
+    password_lock: true
+    generate_ssh_key: true
+    ssh_key_type: rsa
+    ssh_key_bits: 2048
+  loop:
+    - dev
+    - monitoring
+
+- name: Allow port 8080 in UFW
+  ansible.builtin.command: ufw allow 8080/tcp
+  register: ufw_8080
+  changed_when: "'Skipping adding existing rule' not in ufw_8080.stdout and 'Skipping adding existing rule' not in ufw_8080.stderr"
+  failed_when: "ufw_8080.rc != 0 and 'Skipping adding existing rule' not in (ufw_8080.stdout + ufw_8080.stderr)"
+
+- name: Allow port 22 in UFW
+  ansible.builtin.command: ufw allow 22/tcp
+  register: ufw_22
+  changed_when: "'Skipping adding existing rule' not in ufw_22.stdout and 'Skipping adding existing rule' not in ufw_22.stderr"
+  failed_when: "ufw_22.rc != 0 and 'Skipping adding existing rule' not in (ufw_22.stdout + ufw_22.stderr)"
+
+- name: Enable UFW firewall
+  ansible.builtin.command: ufw --force enable
+  changed_when: false
+
+- name: Ensure heartbeat log exists and is writable by monitoring
+  ansible.builtin.file:
+    path: /var/log/heartbeat.log
+    state: touch
+    owner: monitoring
+    group: monitoring
+    mode: '0644'
+
+- name: Ensure Nginx web root exists
+  ansible.builtin.file:
+    path: /var/www/html/ansible
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Deploy welcome page for Nginx on port 8080
+  ansible.builtin.copy:
+    dest: /var/www/html/ansible/index.html
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      <!doctype html>
+      <html lang="en">
+      <head>
+        <meta charset="utf-8">
+        <title>Welcome</title>
+      </head>
+      <body>
+        <h1>Nginx on port 8080 configured by Ansible</h1>
+        <p>Welcome to the base setup page.</p>
+      </body>
+      </html>
+
+- name: Deploy Nginx site for port 8080
+  ansible.builtin.template:
+    src: nginx-8080.conf.j2
+    dest: /etc/nginx/sites-available/ansible_8080.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart nginx
+
+- name: Enable Nginx site for port 8080
+  ansible.builtin.file:
+    src: /etc/nginx/sites-available/ansible_8080.conf
+    dest: /etc/nginx/sites-enabled/ansible_8080.conf
+    state: link
+    force: true
+  notify: restart nginx
+
+- name: Deploy MOTD message
+  ansible.builtin.copy:
+    src: motd
+    dest: /etc/motd
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Add heartbeat cron job for monitoring user
+  ansible.builtin.cron:
+    name: heartbeat log
+    user: monitoring
+    minute: '*/5'
+    job: 'date >> /var/log/heartbeat.log'
+
+- name: Ensure Nginx service is enabled and running
+  ansible.builtin.systemd_service:
+    name: nginx
+    enabled: true
+    state: started

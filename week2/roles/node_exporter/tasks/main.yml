@@ -1,0 +1,86 @@
+﻿---
+- name: Ensure node_exporter user exists
+  ansible.builtin.user:
+    name: node_exporter
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+
+- name: Ensure node_exporter directory exists
+  ansible.builtin.file:
+    path: /opt/node_exporter
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Download node_exporter archive
+  ansible.builtin.get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    mode: '0644'
+  vars:
+    node_exporter_version: '1.10.2'
+    node_exporter_arch_map:
+      x86_64: amd64
+      aarch64: arm64
+      armv7l: armv7
+    node_exporter_arch: "{{ node_exporter_arch_map.get(ansible_architecture, ansible_architecture) }}"
+
+- name: Unpack node_exporter archive
+  ansible.builtin.unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-{{ node_exporter_arch }}.tar.gz"
+    dest: /opt/node_exporter
+    remote_src: true
+    extra_opts:
+      - --strip-components=1
+  vars:
+    node_exporter_version: '1.10.2'
+    node_exporter_arch_map:
+      x86_64: amd64
+      aarch64: arm64
+      armv7l: armv7
+    node_exporter_arch: "{{ node_exporter_arch_map.get(ansible_architecture, ansible_architecture) }}"
+  notify: restart node_exporter
+
+- name: Ensure node_exporter binary permissions are correct
+  ansible.builtin.file:
+    path: /opt/node_exporter/node_exporter
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Create symlink for node_exporter binary
+  ansible.builtin.file:
+    src: /opt/node_exporter/node_exporter
+    dest: /usr/local/bin/node_exporter
+    state: link
+    force: true
+  notify: restart node_exporter
+
+- name: Install node_exporter systemd unit
+  ansible.builtin.template:
+    src: node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart node_exporter
+
+- name: Ensure node_exporter service is enabled and running
+  ansible.builtin.systemd_service:
+    name: node_exporter
+    enabled: true
+    daemon_reload: true
+    state: started
+
+- name: Allow port 9100 in UFW
+  ansible.builtin.command: ufw allow 9100/tcp
+  register: ufw_9100
+  changed_when: "'Skipping adding existing rule' not in ufw_9100.stdout and 'Skipping adding existing rule' not in ufw_9100.stderr"
+  failed_when: "ufw_9100.rc != 0 and 'Skipping adding existing rule' not in (ufw_9100.stdout + ufw_9100.stderr)"
+
+- name: Check that node_exporter metrics are available
+  ansible.builtin.command: curl -fsS http://localhost:9100/metrics
+  register: node_exporter_metrics
+  changed_when: false
