@@ -13,6 +13,7 @@
 | [Week 5](#week-5---observability) | Observability | [Tasks](week5/tasks.md) |
 | [Week 6](#week-6---sre--gitops) | SRE, GitOps | [GitOps Cookbook](week6/docs/gitops+cookbook.pdf) |
 | [Week 7](#week-7---devsecops) | DevSecOps | [Tasks](week7/tasks.md) |
+| [Vagrant](/vagrant/vagrant.md) | DevOps | [Литература](/vagrant/docs.md) |
 | [Дополнительно](#дополнительно) | Разбор вопросов | [Questions](addition/questions.md), [Литература](/addition/quick_docs.md) |
 
 ## Структура
